@@ -1,15 +1,9 @@
 import os
-import sys
 
 import librosa
-import matplotlib.pyplot as plt
-import sounddevice
-import pyaudio
-import torch
-from torchvision import datasets, transforms
-from torch.utils import data as data
-import numpy as np
 from PIL import Image
+from torchvision import datasets
+import numpy as np
 
 SAMPLING_RATE = 16000
 DURATION = 2

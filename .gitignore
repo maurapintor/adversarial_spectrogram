@@ -1,2 +1,3 @@
 .idea/
-speech_commands_dataset/
+data/speech_commands_dataset/
+data/speech_commands_prepared/

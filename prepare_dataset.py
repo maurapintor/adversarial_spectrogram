@@ -1,15 +1,20 @@
 import os
 from shutil import copyfile
 
-src_dir = '/home/maurapintor/data/speech/'
-dst_dir = '/home/maurapintor/data/SPEECH/'
+src_dir = 'speech_commands_dataset'
+dst_dir = 'speech_commands_prepared'
+
+if not os.path.exists(dst_dir):
+    os.mkdir(dst_dir)
+for f in ['train', 'validation', 'test']:
+    if not os.path.exists(os.path.join(dst_dir, f)):
+        os.mkdir(os.path.join(dst_dir, f))
 
 validation_file = os.path.join(src_dir, 'validation_list.txt')
 testing_file = os.path.join(src_dir, 'testing_list.txt')
 
 data_files = [validation_file, testing_file]
 data_dirs = ['validation', 'test']
-
 def prepare_ds():
     all_fnames = []
     for i, phase in enumerate(('validation', 'test')):
@@ -42,7 +47,4 @@ def prepare_ds():
             else:
                 print("Skipping file: {}".format(fname))
 
-with open(data_files[0], newline='\n') as f:
-    fnames = f.read().splitlines()
-    fnames = list(filter(lambda x : any([x.startswith(d) for d in ['yes', 'no', 'up', 'down']]), fnames))
-    print(len(fnames))
+prepare_ds()
