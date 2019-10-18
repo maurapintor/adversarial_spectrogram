@@ -26,11 +26,16 @@ class ModelTrainer:
         self.epochs = self.config.getint('TRAINING', 'epochs', fallback=30)
         self.base_dir = self.config.get('DATA', 'base_dir', fallback='data/speech_commands_prepared')
         self.include_dirs = self.config.get('DATA', 'include_dirs', fallback='yes,no,down,up').split(',')
+        self.lr = self.config.getfloat('TRAINING', 'learning_rate', fallback=0.001)
+        self.weight_decay = self.config.getfloat('TRAINING', 'weight_decay', fallback=0.001)
+        self.lr_decay = self.config.getfloat('TRAINING', 'lr_decay', fallback=0.1)
+        self.batch_size = self.config.getint('TRAINING', 'batch_size', fallback=64)
+        self.n_workers = self.config.getint('TRAINING', 'n_workers', fallback=1)
         self.best_acc = 0
         self.losses = []
         self.lrs = []
         self.device = torch.device("cuda" if torch.cuda.is_available() and
-                                   self.config.getboolean('TRAINING', 'use_cuda', fallback=True) else "cpu")
+                                             self.config.getboolean('TRAINING', 'use_cuda', fallback=True) else "cpu")
         self.transform = transforms.ToTensor()
 
         self.train_dataset = AudioDataFolders(root=os.path.join(self.base_dir, 'train'),
@@ -45,13 +50,17 @@ class ModelTrainer:
                                              extensions=('.wav',),
                                              transform=self.transform,
                                              include_folders=self.include_dirs)
-        self.train_loader = data.DataLoader(self.train_dataset, batch_size=64, shuffle=True, num_workers=4)
-        self.validation_loader = data.DataLoader(self.validation_dataset, batch_size=64, shuffle=False, num_workers=4)
-        self.test_loader = data.DataLoader(self.test_dataset, batch_size=64, shuffle=False, num_workers=4)
+        self.train_loader = data.DataLoader(self.train_dataset, batch_size=self.batch_size,
+                                            shuffle=True, num_workers=self.n_workers)
+        self.validation_loader = data.DataLoader(self.validation_dataset, batch_size=self.batch_size,
+                                                 shuffle=False, num_workers=self.n_workers)
+        self.test_loader = data.DataLoader(self.test_dataset, batch_size=self.batch_size,
+                                           shuffle=False, num_workers=self.n_workers)
         self.model = Net().to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001, weight_decay=0.001)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         self.criterion = nn.CrossEntropyLoss()
-        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.scheduler_steps, gamma=0.1)
+        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.scheduler_steps,
+                                                        gamma=self.lr_decay)
 
     def train_epoch(self, epoch):
         losses = []
