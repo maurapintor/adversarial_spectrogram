@@ -1,3 +1,5 @@
 from audio_torch import ModelTrainer
 
-model_trainer = ModelTrainer()
+if __name__ == '__main__':
+    model_trainer = ModelTrainer()
+    model_trainer.fit()

@@ -11,42 +11,48 @@ from torch import optim
 import os
 import configparser
 from torch import nn
+import matplotlib.pyplot as plt
 
 from net import Net
 
 
 class ModelTrainer:
     def __init__(self):
-        # TODO get all possible attributes from config file
         self.config = configparser.ConfigParser()
         self.config.read('config.ini')
         self.log_interval = self.config.getint('TRAINING', 'log_interval', fallback=10)
         self.scheduler_steps = self.config.get('TRAINING', 'scheduler_steps', fallback='15,20').split(',')
-        self.scheduler_steps = map(int, self.scheduler_steps)
+        self.scheduler_steps = list(map(int, self.scheduler_steps))
         self.epochs = self.config.getint('TRAINING', 'epochs', fallback=30)
-        self.base_dir = self.config.get('DATA', 'base_dir', fallback='data/speech_commands_prepared')
+        self.data_dir = self.config.get('DATA', 'data_dir', fallback='data/speech_commands_prepared')
         self.include_dirs = self.config.get('DATA', 'include_dirs', fallback='yes,no,down,up').split(',')
         self.lr = self.config.getfloat('TRAINING', 'learning_rate', fallback=0.001)
         self.weight_decay = self.config.getfloat('TRAINING', 'weight_decay', fallback=0.001)
         self.lr_decay = self.config.getfloat('TRAINING', 'lr_decay', fallback=0.1)
         self.batch_size = self.config.getint('TRAINING', 'batch_size', fallback=64)
         self.n_workers = self.config.getint('TRAINING', 'n_workers', fallback=1)
+        self.model_dir = self.config.get('RESULTS', 'model_dir', fallback="data/models")
+        self.plot_dir = self.config.get('RESULTS', 'plot_dir', fallback="data/plots")
+        for d in (self.model_dir, self.plot_dir):
+            if not os.path.exists(d):
+                os.mkdir(d)
         self.best_acc = 0
         self.losses = []
         self.lrs = []
         self.device = torch.device("cuda" if torch.cuda.is_available() and
                                              self.config.getboolean('TRAINING', 'use_cuda', fallback=True) else "cpu")
+        logging.info("Using device : {}".format(self.device))
         self.transform = transforms.ToTensor()
 
-        self.train_dataset = AudioDataFolders(root=os.path.join(self.base_dir, 'train'),
+        self.train_dataset = AudioDataFolders(root=os.path.join(self.data_dir, 'train'),
                                               extensions=('.wav',),
                                               transform=self.transform,
                                               include_folders=self.include_dirs)
-        self.validation_dataset = AudioDataFolders(root=os.path.join(self.base_dir, 'validation'),
+        self.validation_dataset = AudioDataFolders(root=os.path.join(self.data_dir, 'validation'),
                                                    extensions=('.wav',),
                                                    transform=self.transform,
                                                    include_folders=self.include_dirs)
-        self.test_dataset = AudioDataFolders(root=os.path.join(self.base_dir, 'test'),
+        self.test_dataset = AudioDataFolders(root=os.path.join(self.data_dir, 'test'),
                                              extensions=('.wav',),
                                              transform=self.transform,
                                              include_folders=self.include_dirs)
@@ -95,9 +101,17 @@ class ModelTrainer:
 
         return correct / total
 
+    def plot_info(self):
+        plt.figure()
+        plt.plot(self.losses)
+        plt.savefig(os.path.join(self.plot_dir, "losses_{}.pdf".format(self.weight_decay)), format='pdf')
+        plt.figure()
+        plt.plot(self.lrs)
+        plt.savefig(os.path.join(self.plot_dir, "learning_rates_{}.pdf".format(self.weight_decay)), format='pdf')
+
     def fit(self):
         logging.info("Init training. LR: {}\tepochs: {}\tlr_scheduling: {}"
-                     "".format(self.scheduler.get_lr(), self.epochs, self.steps))
+                     "".format(self.scheduler.get_lr(), self.epochs, self.scheduler_steps))
 
         for epoch in range(1, self.epochs + 1):
             self.losses.extend(self.train_epoch(epoch))
@@ -108,10 +122,11 @@ class ModelTrainer:
                 self.best_acc = val_acc
                 logging.info("Validation acc: {:.3f}\tBest acc so far: {:.3f}."
                              "\tSaving model...".format(val_acc, self.best_acc))
-                torch.save(self.model.state_dict(), "models/trained-wd-0.pt")
+                torch.save(self.model.state_dict(),
+                           os.path.join(self.model_dir, "trained-wd-{:.6f}.pt"
+                                                        "".format(self.weight_decay)))
             self.scheduler.step(epoch)
             self.lrs.append(self.scheduler.get_lr())
-
         logging.info("Training completed. Computing test accuracy...")
-
+        self.plot_info()
         self.evaluate(self.test_loader)
