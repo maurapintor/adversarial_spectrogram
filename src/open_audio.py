@@ -1,9 +1,7 @@
 import os
 import librosa
 import matplotlib.pyplot as plt
-import sounddevice
 import numpy as np
-import pyaudio
 base_dir = '/home/maurapintor/data/speech/'
 
 kw_list = ['yes', 'no', 'down', 'up']

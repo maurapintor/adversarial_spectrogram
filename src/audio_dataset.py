@@ -2,6 +2,7 @@ import os
 
 import librosa
 from PIL import Image
+from scipy.io import wavfile
 from torchvision import datasets
 import numpy as np
 
@@ -47,6 +48,15 @@ class AudioDataFolders(datasets.DatasetFolder):
             y[:duration] = audio[:]
         S = librosa.feature.melspectrogram(y, sr=sr, hop_length=HOP_LENGTH)
         return Image.fromarray(S)
+
+    @staticmethod
+    def invert_spectrogram(s):
+        return librosa.feature.inverse.mel_to_audio(s, sr=SAMPLING_RATE, hop_length=HOP_LENGTH)
+
+    @staticmethod
+    def save_audio(audio, fname):
+        wavfile.write(fname, SAMPLING_RATE, audio)
+
 
     def __len__(self):
         return len(self.samples)

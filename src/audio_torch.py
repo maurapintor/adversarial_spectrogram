@@ -12,7 +12,7 @@ import os
 import configparser
 from torch import nn
 import matplotlib.pyplot as plt
-
+import torchattacks
 from net import Net
 
 
@@ -130,3 +130,64 @@ class ModelTrainer:
         logging.info("Training completed. Computing test accuracy...")
         self.plot_info()
         self.evaluate(self.test_loader)
+
+    def load_model(self, model_name):
+        self.model.load_state_dict(torch.load(os.path.join(self.model_dir, model_name)))
+
+    def create_adv_ds(self, loader, eps):
+        if eps == 0:
+            for data, target in loader:
+                yield data, target
+        else:
+            pgd_attack = torchattacks.FGSM(self.model, eps=eps)
+            for data, target in loader:
+                data, target = data.to(self.device), target.to(self.device)
+                adversarial_images = pgd_attack(data, target)
+                yield adversarial_images, target
+
+    def security_evaluation(self, values):
+        accuracies = []
+        for i, eps_value in enumerate(values):
+            adv_ds = self.create_adv_ds(self.test_loader, eps=eps_value)
+            accuracies.append(self.evaluate(adv_ds))
+        return accuracies
+
+    def create_audio_examples(self, eps, alpha=None, iters=None):
+        if alpha is None:
+            alpha = eps/10
+        if iters is None:
+            iters = 10
+        adv_loader = self.create_adv_ds(self.test_loader, eps=eps)
+        batch_images, batch_labels = next(iter(self.test_loader))
+        batch_images_adv, _ = next(adv_loader)
+        batch_images, batch_images_adv = batch_images.to(self.device), batch_images_adv.to(self.device)
+        cls_to_idx = self.train_dataset.class_to_idx
+        cls_to_idx = {v: k for k, v in cls_to_idx.items()}
+        for image, adv_image, label in zip(batch_images, batch_images_adv, batch_labels):
+            print(adv_image.max(), image.max())
+            predicted = self.model(image.unsqueeze(0)).topk(1)[1]
+            adv_pred= self.model(adv_image.unsqueeze(0)).topk(1)[1]
+            image = image.squeeze().cpu().detach().numpy()
+            adv_image = adv_image.squeeze().cpu().detach().numpy()
+            diff_img = image - adv_image
+            diff_img -= diff_img.min()
+            diff_img /= diff_img.max()
+            # store spectrogram
+            plt.figure(figsize=(15, 5))
+            plt.subplot(1, 3, 1)
+            plt.imshow(image)
+            plt.title("ORIGINAL IMAGE\n{} ({})"
+                      "".format(cls_to_idx[label.item()], cls_to_idx[predicted.item()]),
+                      color=("green" if label.item() == predicted.item() else "red"))
+            plt.subplot(1, 3, 2)
+            plt.imshow(adv_image)
+            plt.title("ADV IMAGE\n{} ({})"
+                      "".format(cls_to_idx[label.item()], cls_to_idx[adv_pred.item()]),
+                      color=("green" if label.item() == adv_pred.item() else "red"))
+            plt.subplot(1, 3, 3)
+            plt.title("Perturbation (dmax = {})".format(eps))
+            plt.imshow(diff_img)
+            plt.show()
+
+            #audio = AudioDataFolders.invert_spectrogram(image.cpu().detach().numpy())
+
