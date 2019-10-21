@@ -5,5 +5,5 @@ if __name__ == '__main__':
     accuracies = []
     model = 'trained-wd-0.000000.pt'
     model_trainer.load_model(model)
-    eps = 0.01
-    model_trainer.create_audio_examples(eps=eps, iters=1, alpha=eps)
+    eps = 0.001
+    model_trainer.create_audio_examples(eps=eps)

@@ -11,7 +11,7 @@ if __name__ == '__main__':
     for model in models:
         if model.endswith('.pt'):
             model_trainer.load_model(model)
-            eps_values = np.arange(start=0, stop=0.1, step=0.005)
+            eps_values = np.arange(start=0, stop=0.1, step=0.01)
             accs = model_trainer.security_evaluation(eps_values)
             accuracies.append(accs)
             plt.plot(eps_values, accs, label=model[:-6])

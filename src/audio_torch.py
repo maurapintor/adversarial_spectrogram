@@ -1,5 +1,7 @@
 import logging
 
+from torchattacks import FGSM
+
 logging.basicConfig()
 logging.root.setLevel(logging.INFO)
 
@@ -12,7 +14,6 @@ import os
 import configparser
 from torch import nn
 import matplotlib.pyplot as plt
-import torchattacks
 from net import Net
 
 
@@ -67,6 +68,11 @@ class ModelTrainer:
         self.criterion = nn.CrossEntropyLoss()
         self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.scheduler_steps,
                                                         gamma=self.lr_decay)
+
+        self.scale_factor = self.train_dataset.max_value
+        logging.info("Scaling the images, scale factor = {}".format(self.scale_factor))
+        # self.rescale = transforms.Lambda(lambda x: x / self.scale_factor)
+        self.inverse_rescale = transforms.Lambda(lambda x: x * self.scale_factor)
 
     def train_epoch(self, epoch):
         losses = []
@@ -132,17 +138,19 @@ class ModelTrainer:
         self.evaluate(self.test_loader)
 
     def load_model(self, model_name):
-        self.model.load_state_dict(torch.load(os.path.join(self.model_dir, model_name)))
+        self.model.load_state_dict(
+            torch.load(os.path.join(self.model_dir, model_name),
+                       map_location=self.device))
 
     def create_adv_ds(self, loader, eps):
         if eps == 0:
             for data, target in loader:
                 yield data, target
         else:
-            pgd_attack = torchattacks.FGSM(self.model, eps=eps)
+            attack = FGSM(self.model, eps=eps)
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
-                adversarial_images = pgd_attack(data, target)
+                adversarial_images = attack(data, target)
                 yield adversarial_images, target
 
     def security_evaluation(self, values):
@@ -152,25 +160,19 @@ class ModelTrainer:
             accuracies.append(self.evaluate(adv_ds))
         return accuracies
 
-    def create_audio_examples(self, eps, alpha=None, iters=None):
-        if alpha is None:
-            alpha = eps/10
-        if iters is None:
-            iters = 10
+    def create_audio_examples(self, eps):
         adv_loader = self.create_adv_ds(self.test_loader, eps=eps)
         batch_images, batch_labels = next(iter(self.test_loader))
         batch_images_adv, _ = next(adv_loader)
-        batch_images, batch_images_adv = batch_images.to(self.device), batch_images_adv.to(self.device)
         cls_to_idx = self.train_dataset.class_to_idx
         cls_to_idx = {v: k for k, v in cls_to_idx.items()}
         for image, adv_image, label in zip(batch_images, batch_images_adv, batch_labels):
-            print(adv_image.max(), image.max())
             predicted = self.model(image.unsqueeze(0)).topk(1)[1]
-            adv_pred= self.model(adv_image.unsqueeze(0)).topk(1)[1]
+            adv_pred = self.model(adv_image.unsqueeze(0)).topk(1)[1]
+            image, adv_image = self.inverse_rescale(image), self.inverse_rescale(adv_image)
             image = image.squeeze().cpu().detach().numpy()
             adv_image = adv_image.squeeze().cpu().detach().numpy()
-            diff_img = image - adv_image
-            diff_img -= diff_img.min()
+            diff_img = abs(image - adv_image)
             diff_img /= diff_img.max()
             # store spectrogram
             plt.figure(figsize=(15, 5))
@@ -188,6 +190,7 @@ class ModelTrainer:
             plt.title("Perturbation (dmax = {})".format(eps))
             plt.imshow(diff_img)
             plt.show()
-
-            #audio = AudioDataFolders.invert_spectrogram(image.cpu().detach().numpy())
+            if label.item() != predicted.item() and predicted.item() != adv_pred.item():
+                audio1 = AudioDataFolders.invert_spectrogram(image)
+                audio2 = AudioDataFolders.invert_spectrogram(adv_image)
 
