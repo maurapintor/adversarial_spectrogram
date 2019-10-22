@@ -1,6 +1,7 @@
 import logging
+from decimal import Decimal
 
-from torchattacks import FGSM
+from torchattacks import FGSM, IFGSM
 
 logging.basicConfig()
 logging.root.setLevel(logging.INFO)
@@ -15,6 +16,7 @@ import configparser
 from torch import nn
 import matplotlib.pyplot as plt
 from net import Net
+from PIL.Image import Image
 
 
 class ModelTrainer:
@@ -147,7 +149,7 @@ class ModelTrainer:
             for data, target in loader:
                 yield data, target
         else:
-            attack = FGSM(self.model, eps=eps)
+            attack = IFGSM(self.model, eps=eps, alpha=eps / 10, iters=10)
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 adversarial_images = attack(data, target)
@@ -167,30 +169,44 @@ class ModelTrainer:
         cls_to_idx = self.train_dataset.class_to_idx
         cls_to_idx = {v: k for k, v in cls_to_idx.items()}
         for image, adv_image, label in zip(batch_images, batch_images_adv, batch_labels):
+            image, adv_image = image.to(self.device), adv_image.to(self.device)
             predicted = self.model(image.unsqueeze(0)).topk(1)[1]
             adv_pred = self.model(adv_image.unsqueeze(0)).topk(1)[1]
-            image, adv_image = self.inverse_rescale(image), self.inverse_rescale(adv_image)
-            image = image.squeeze().cpu().detach().numpy()
-            adv_image = adv_image.squeeze().cpu().detach().numpy()
-            diff_img = abs(image - adv_image)
-            diff_img /= diff_img.max()
-            # store spectrogram
-            plt.figure(figsize=(15, 5))
-            plt.subplot(1, 3, 1)
-            plt.imshow(image)
-            plt.title("ORIGINAL IMAGE\n{} ({})"
-                      "".format(cls_to_idx[label.item()], cls_to_idx[predicted.item()]),
-                      color=("green" if label.item() == predicted.item() else "red"))
-            plt.subplot(1, 3, 2)
-            plt.imshow(adv_image)
-            plt.title("ADV IMAGE\n{} ({})"
-                      "".format(cls_to_idx[label.item()], cls_to_idx[adv_pred.item()]),
-                      color=("green" if label.item() == adv_pred.item() else "red"))
-            plt.subplot(1, 3, 3)
-            plt.title("Perturbation (dmax = {})".format(eps))
-            plt.imshow(diff_img)
-            plt.show()
-            if label.item() != predicted.item() and predicted.item() != adv_pred.item():
+            if label.item() == predicted.item() and predicted.item() != adv_pred.item():
+                image, adv_image = self.inverse_rescale(image), self.inverse_rescale(adv_image)
+                image = image.squeeze().cpu().detach().numpy()
+                adv_image = adv_image.squeeze().cpu().detach().numpy()
+                diff_img = (image - adv_image)
+                diff_img -= diff_img.min()
+                diff_img /= diff_img.max()
+                # store spectrogram
+                plt.figure(figsize=(15, 5))
+                plt.subplot(1, 3, 1)
+                plt.imshow(image, cmap='gray')
+                plt.title("ORIGINAL IMAGE\n{} ({})"
+                          "".format(cls_to_idx[label.item()], cls_to_idx[predicted.item()]),
+                          color=("green" if label.item() == predicted.item() else "red"))
+                plt.subplot(1, 3, 2)
+                plt.imshow(adv_image, cmap='gray')
+                plt.title("ADV IMAGE\n{} ({})"
+                          "".format(cls_to_idx[label.item()], cls_to_idx[adv_pred.item()]),
+                          color=("green" if label.item() == adv_pred.item() else "red"))
+                plt.subplot(1, 3, 3)
+                plt.title("Perturbation (dmax = {:.2E})".format(Decimal(eps)))
+                plt.imshow(diff_img, cmap='gray')
+                plt.savefig(os.path.join(self.plot_dir, "perturbation.pdf"), format='pdf')
+
+                print("saving audios")
                 audio1 = AudioDataFolders.invert_spectrogram(image)
                 audio2 = AudioDataFolders.invert_spectrogram(adv_image)
-
+                AudioDataFolders.save_audio(
+                    audio1,
+                    os.path.join(self.plot_dir,
+                                 'original_{}.wav'
+                                 ''.format(label.item())))
+                AudioDataFolders.save_audio(
+                    audio2,
+                    os.path.join(self.plot_dir,
+                                 'perturbed_{}.wav'
+                                 ''.format(adv_pred.item())))
+                break

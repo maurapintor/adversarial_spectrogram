@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 if __name__ == '__main__':
     model_trainer = ModelTrainer()
     accuracies = []
-    models = ['trained-wd-0.000000.pt', 'trained-wd-0.010000.pt']
+    models = ['trained-wd-0.000000.pt', 'trained-wd-0.000100.pt']
     plt.figure()
     for model in models:
         if model.endswith('.pt'):

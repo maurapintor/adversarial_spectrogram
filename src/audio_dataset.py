@@ -10,7 +10,6 @@ SAMPLING_RATE = 16000
 DURATION = 2
 SAMPLES = SAMPLING_RATE * DURATION
 HOP_LENGTH = 100
-N_MFCC=200
 
 
 class AudioDataFolders(datasets.DatasetFolder):
@@ -47,12 +46,12 @@ class AudioDataFolders(datasets.DatasetFolder):
         duration = audio.shape[0]
         if duration < SAMPLES:
             y[:duration] = audio[:]
-        S = librosa.feature.mfcc(y, sr=sr, hop_length=HOP_LENGTH, n_mfcc=N_MFCC)
-        return Image.fromarray(S/self.max_value)
+        S = librosa.feature.melspectrogram(y, sr=sr, hop_length=HOP_LENGTH, power=2.0)
+        return Image.fromarray(S / self.max_value)
 
     @staticmethod
     def invert_spectrogram(s):
-        return librosa.feature.inverse.mel_to_audio(s, sr=SAMPLING_RATE, hop_length=HOP_LENGTH)
+        return librosa.feature.inverse.mel_to_audio(s, sr=SAMPLING_RATE, hop_length=HOP_LENGTH, power=2.0)
 
     @staticmethod
     def save_audio(audio, fname):
@@ -63,4 +62,4 @@ class AudioDataFolders(datasets.DatasetFolder):
 
     @property
     def max_value(self):
-        return 1
+        return 1125 * np.log(1 + (SAMPLING_RATE / 700))
