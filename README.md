@@ -74,7 +74,7 @@ In the `TRAINING` section:
 |`use_cuda`|_bool_ - whether to use GPU, if available|True|
 |`learning_rate`|_float_ - starting learning rate to use for training|0.001|
 |`weight_decay`|_float_ - weight decay for the optimizer to use during training|0.0001|
-|`lr_decay`|_float_ - multiplier for the learning rate, will decrease the learning rate in the epochs marked as steps (`scheduler_steps`)||
+|`lr_decay`|_float_ - multiplier for the learning rate, will decrease the learning rate in the epochs marked as steps (`scheduler_steps`)|0.0001|
 |`batch_size`|_int_ - number of samples for each batch|64|
 |`n_workers`|_int_ - number of workers to use for loading the dataset|2|
 

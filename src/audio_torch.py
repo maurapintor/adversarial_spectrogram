@@ -1,5 +1,4 @@
 import logging
-import random
 from decimal import Decimal
 
 import torchattacks
@@ -17,7 +16,6 @@ import configparser
 from torch import nn
 import matplotlib.pyplot as plt
 from net import Net
-from PIL.Image import Image
 
 
 class ModelTrainer:
@@ -30,6 +28,7 @@ class ModelTrainer:
         self.epochs = self.config.getint('TRAINING', 'epochs', fallback=30)
         self.data_dir = self.config.get('DATA', 'data_dir', fallback='data/speech_commands_prepared')
         self.include_dirs = self.config.get('DATA', 'include_dirs', fallback='yes,no,down,up').split(',')
+        self.n_test = self.config.getint('DATA', 'n_test', fallback=1000)
         self.lr = self.config.getfloat('TRAINING', 'learning_rate', fallback=0.001)
         self.weight_decay = self.config.getfloat('TRAINING', 'weight_decay', fallback=0.001)
         self.lr_decay = self.config.getfloat('TRAINING', 'lr_decay', fallback=0.1)
@@ -60,12 +59,20 @@ class ModelTrainer:
                                              extensions=('.wav',),
                                              transform=self.transform,
                                              include_folders=self.include_dirs)
+
+        self.subset_idxs = torch.randperm(len(self.test_dataset))
+        self.subset_idxs = self.subset_idxs[:self.n_test]
+        self.test_subset = data.Subset(self.test_dataset, self.subset_idxs)
+
         self.train_loader = data.DataLoader(self.train_dataset, batch_size=self.batch_size,
                                             shuffle=True, num_workers=self.n_workers)
         self.validation_loader = data.DataLoader(self.validation_dataset, batch_size=self.batch_size,
                                                  shuffle=False, num_workers=self.n_workers)
         self.test_loader = data.DataLoader(self.test_dataset, batch_size=self.batch_size,
                                            shuffle=False, num_workers=self.n_workers)
+        self.subset_loader = data.DataLoader(self.test_subset, batch_size=self.batch_size,
+                                             shuffle=False, num_workers=self.n_workers)
+
         self.model = Net(n_output=len(self.include_dirs)).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         self.criterion = nn.CrossEntropyLoss()
@@ -83,8 +90,13 @@ class ModelTrainer:
         for batch_idx, (data, target) in enumerate(self.train_loader):
             self.optimizer.zero_grad()
             data, target = data.to(self.device), target.to(self.device)
+            data.requires_grad = True
             output = self.model(data)
-            loss = self.criterion(output, target)
+            loss = self.criterion(output, target) + \
+                    torch.autograd.grad(self.criterion(output, target),
+                                       data,
+                                       retain_graph=True,
+                                       create_graph=True)[0].mean()
             loss.backward()
             self.optimizer.step()
             if batch_idx % self.log_interval == 0:  # print training stats
@@ -150,7 +162,7 @@ class ModelTrainer:
             for data, target in loader:
                 yield data, target
         else:
-            attack = torchattacks.PGD(self.model, eps=eps, alpha=eps / 2, iters=2)
+            attack = torchattacks.IFGSM(self.model, eps=eps, alpha=eps / 10, iters=10)
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 adversarial_images = attack(data, target)
@@ -159,66 +171,71 @@ class ModelTrainer:
     def security_evaluation(self, values):
         accuracies = []
         for i, eps_value in enumerate(values):
-            adv_ds = self.create_adv_ds(self.test_loader, eps=eps_value)
+            adv_ds = self.create_adv_ds(self.subset_loader, eps=eps_value)
             accuracies.append(self.evaluate(adv_ds))
         return accuracies
 
-    def create_audio_examples(self, eps):
+    def create_audio_examples(self, eps, n_samples=3):
         i = 0
-        adv_loader = self.create_adv_ds(self.test_loader, eps=eps)
-        batch_images, batch_labels = next(iter(self.test_loader))
-        batch_images_adv, _ = next(adv_loader)
+        adv_loader = self.create_adv_ds(self.subset_loader, eps=eps)
         cls_to_idx = self.train_dataset.class_to_idx
         cls_to_idx = {v: k for k, v in cls_to_idx.items()}
-        for image, adv_image, label in zip(batch_images, batch_images_adv, batch_labels):
-            image, adv_image = image.to(self.device), adv_image.to(self.device)
-            predicted = self.model(image.unsqueeze(0)).topk(1)[1]
-            adv_pred = self.model(adv_image.unsqueeze(0)).topk(1)[1]
-            i += 1
-            if label.item() == predicted.item() \
-                    and predicted.item() != adv_pred.item():
-                folder = os.path.join(self.plot_dir, "{}_to_{}".format(label.item(), adv_pred.item()))
-                if not os.path.exists(folder):
-                    os.mkdir(folder)
-                    image, adv_image = self.inverse_rescale(image), self.inverse_rescale(adv_image)
-                    image = image.squeeze().cpu().detach().numpy()
-                    adv_image = adv_image.squeeze().cpu().detach().numpy()
-                    diff_img = (image - adv_image)
-                    diff_img -= diff_img.min()
-                    diff_img /= diff_img.max()
-                    # store spectrogram
-                    plt.figure(figsize=(5, 10))
-                    plt.subplot(3, 1, 1)
-                    plt.imshow(image, cmap='gray_r')
-                    plt.axis('off')
-                    plt.title("ORIGINAL IMAGE\n{} ({})"
-                              "".format(cls_to_idx[label.item()], cls_to_idx[predicted.item()]),
-                              color=("green" if label.item() == predicted.item() else "red"))
-                    plt.subplot(3, 1, 2)
-                    plt.imshow(adv_image, cmap='gray_r')
-                    plt.axis('off')
-                    plt.title("ADV IMAGE\n{} ({})"
-                              "".format(cls_to_idx[label.item()], cls_to_idx[adv_pred.item()]),
-                              color=("green" if label.item() == adv_pred.item() else "red"))
-                    plt.subplot(3, 1, 3)
-                    plt.title("Perturbation (dmax = {:.2E})".format(Decimal(eps)))
-                    plt.imshow(diff_img, cmap='gray_r')
-                    plt.axis('off')
-                    plt.savefig(os.path.join(folder,
-                                             "perturbation_{}_to_{}.pdf"
-                                             "".format(label.item(), adv_pred.item())),
-                                format='pdf')
-
-                    print("saving audios")
-                    audio1 = AudioDataFolders.invert_spectrogram(image)
-                    audio2 = AudioDataFolders.invert_spectrogram(adv_image)
-                    AudioDataFolders.save_audio(
-                        audio1,
-                        os.path.join(folder,
-                                     'original_{}.wav'
-                                     ''.format(label.item())))
-                    AudioDataFolders.save_audio(
-                        audio2,
-                        os.path.join(folder,
-                                     'perturbed_{}.wav'
-                                     ''.format(adv_pred.item())))
+        for (batch_images, batch_labels), (batch_images_adv, _) in zip(self.subset_loader, adv_loader):
+            for image, adv_image, label in zip(batch_images, batch_images_adv, batch_labels):
+                image, adv_image = image.to(self.device), adv_image.to(self.device)
+                predicted = self.model(image.unsqueeze(0)).topk(1)[1]
+                adv_pred = self.model(adv_image.unsqueeze(0)).topk(1)[1]
+                if label.item() == predicted.item() \
+                        and predicted.item() != adv_pred.item():
+                    i += 1
+                    folder = os.path.join(self.plot_dir, "{}_to_{}".format(label.item(), adv_pred.item()))
+                    if not os.path.exists(folder):
+                        os.mkdir(folder)
+                        image, adv_image = self.inverse_rescale(image), self.inverse_rescale(adv_image)
+                        image = image.squeeze().cpu().detach().numpy()
+                        adv_image = adv_image.squeeze().cpu().detach().numpy()
+                        diff_img = (image - adv_image)
+                        diff_img -= diff_img.min()
+                        # store spectrogram
+                        plt.figure(figsize=(5, 10))
+                        plt.subplot(3, 1, 1)
+                        plt.tick_params(color='black')
+                        plt.imshow(image, cmap='gray_r')
+                        plt.xticks([])
+                        plt.yticks([])
+                        plt.title("ORIGINAL IMAGE\n{} ({})"
+                                  "".format(cls_to_idx[label.item()], cls_to_idx[predicted.item()]),
+                                  color=("green" if label.item() == predicted.item() else "red"))
+                        plt.subplot(3, 1, 2)
+                        plt.tick_params(color='black')
+                        plt.imshow(adv_image, cmap='gray_r')
+                        plt.xticks([])
+                        plt.yticks([])
+                        plt.title("ADV IMAGE\n{} ({})"
+                                  "".format(cls_to_idx[label.item()], cls_to_idx[adv_pred.item()]),
+                                  color=("green" if label.item() == adv_pred.item() else "red"))
+                        plt.subplot(3, 1, 3)
+                        plt.title("Perturbation (dmax = {:.2E})".format(Decimal(eps)))
+                        plt.tick_params(color='black')
+                        plt.imshow(diff_img, cmap='gray_r')
+                        plt.xticks([])
+                        plt.yticks([])
+                        plt.show()
+                        plt.savefig(os.path.join(folder,
+                                                 "perturbation_{}_to_{}.pdf"
+                                                 "".format(label.item(), adv_pred.item())),
+                                    format='pdf')
+                        print("saving audios")
+                        audio1 = AudioDataFolders.invert_spectrogram(image)
+                        audio2 = AudioDataFolders.invert_spectrogram(adv_image)
+                        AudioDataFolders.save_audio(
+                            audio1,
+                            os.path.join(folder,
+                                         'original_{}.wav'
+                                         ''.format(label.item())))
+                        AudioDataFolders.save_audio(
+                            audio2,
+                            os.path.join(folder,
+                                         'perturbed_{}.wav'
+                                         ''.format(adv_pred.item())))
+                        if i == n_samples: break

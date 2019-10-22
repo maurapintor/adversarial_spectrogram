@@ -13,12 +13,17 @@ if __name__ == '__main__':
     for model in models:
         if model.endswith('.pt'):
             model_trainer.load_model(model)
-            eps_values = np.arange(start=0, stop=0.1, step=0.01)
+            eps_values = np.arange(start=0, stop=0.1, step=0.02)
             eps_values /= model_trainer.train_dataset.max_value
             accs = model_trainer.security_evaluation(eps_values)
             accuracies.append(accs)
-            wd = Decimal(float(model.split('-')[-1][:-3]))
-            plt.plot(eps_values, accs, label="{:.2E}".format(wd))
+            wd = float(model.split('-')[-1][:-3])
+            if wd == 0:
+                label_str = "WD = 0"
+            else:
+                wd = Decimal(wd)
+                label_str = "WD = {:.2E}".format(wd)
+            plt.plot(eps_values, accs, label=label_str)
             plt.title("Security evaluation")
             plt.xlabel("Perturbation strength")
             plt.ylabel("Test accuracy")
