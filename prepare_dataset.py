@@ -47,4 +47,5 @@ def prepare_ds():
             else:
                 print("Skipping file: {}".format(fname))
 
-prepare_ds()
+if __name__ == '__main__':
+    prepare_ds()

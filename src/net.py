@@ -4,7 +4,7 @@ from torch import nn
 
 class Net(torch.nn.Module):
 
-    def __init__(self):
+    def __init__(self, n_output):
         super(Net, self).__init__()
         self.conv1 = torch.nn.Conv2d(in_channels=1, out_channels=6,
                                      kernel_size=9, stride=1,
@@ -16,7 +16,7 @@ class Net(torch.nn.Module):
         self.max_pool_2 = torch.nn.MaxPool2d(kernel_size=4)
         self.fc1 = torch.nn.Linear(16 * 6 * 18, 1024)
         self.fc2 = torch.nn.Linear(1024, 256)
-        self.fc3 = torch.nn.Linear(256, 10)
+        self.fc3 = torch.nn.Linear(256, n_output)
 
     def forward(self, x):
         x = torch.relu(self.conv1(x))

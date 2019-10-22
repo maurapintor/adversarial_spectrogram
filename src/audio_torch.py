@@ -66,7 +66,7 @@ class ModelTrainer:
                                                  shuffle=False, num_workers=self.n_workers)
         self.test_loader = data.DataLoader(self.test_dataset, batch_size=self.batch_size,
                                            shuffle=False, num_workers=self.n_workers)
-        self.model = Net().to(self.device)
+        self.model = Net(n_output=len(self.include_dirs)).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         self.criterion = nn.CrossEntropyLoss()
         self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.scheduler_steps,
