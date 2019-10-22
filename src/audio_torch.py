@@ -22,15 +22,18 @@ class ModelTrainer:
     def __init__(self):
         self.config = configparser.ConfigParser()
         self.config.read('config.ini')
-        self.log_interval = self.config.getint('TRAINING', 'log_interval', fallback=10)
-        self.scheduler_steps = self.config.get('TRAINING', 'scheduler_steps', fallback='15,20').split(',')
+        self.log_interval = self.config.getint('TRAINING', 'log_interval', fallback=100)
+        self.scheduler_steps = self.config.get('TRAINING', 'scheduler_steps', fallback='20,40').split(',')
         self.scheduler_steps = list(map(int, self.scheduler_steps))
         self.epochs = self.config.getint('TRAINING', 'epochs', fallback=30)
         self.data_dir = self.config.get('DATA', 'data_dir', fallback='data/speech_commands_prepared')
-        self.include_dirs = self.config.get('DATA', 'include_dirs', fallback='yes,no,down,up').split(',')
+        self.include_dirs = self.config.get('DATA', 'include_dirs',
+                                            fallback='down,go,left,no,off,'
+                                                     'on,right,stop,up,yes').split(',')
         self.n_test = self.config.getint('DATA', 'n_test', fallback=1000)
         self.lr = self.config.getfloat('TRAINING', 'learning_rate', fallback=0.001)
-        self.weight_decay = self.config.getfloat('TRAINING', 'weight_decay', fallback=0.001)
+        self.weight_decay = self.config.getfloat('TRAINING', 'weight_decay', fallback=0)
+        self.gradient_penalty = self.config.getfloat('TRAINING', 'gradient_penalty', fallback=0)
         self.lr_decay = self.config.getfloat('TRAINING', 'lr_decay', fallback=0.1)
         self.batch_size = self.config.getint('TRAINING', 'batch_size', fallback=64)
         self.n_workers = self.config.getint('TRAINING', 'n_workers', fallback=1)
@@ -92,11 +95,12 @@ class ModelTrainer:
             data, target = data.to(self.device), target.to(self.device)
             data.requires_grad = True
             output = self.model(data)
-            loss = self.criterion(output, target) + \
-                    torch.autograd.grad(self.criterion(output, target),
-                                       data,
-                                       retain_graph=True,
-                                       create_graph=True)[0].mean()
+            loss = self.criterion(output, target)
+            if self.gradient_penalty != 0:
+                loss += torch.norm(torch.autograd.grad(self.criterion(output, target),
+                                            data,
+                                            retain_graph=True,
+                                            create_graph=True)[0])
             loss.backward()
             self.optimizer.step()
             if batch_idx % self.log_interval == 0:  # print training stats
@@ -144,7 +148,7 @@ class ModelTrainer:
                 logging.info("Validation acc: {:.3f}\tBest acc so far: {:.3f}."
                              "\tSaving model...".format(val_acc, self.best_acc))
                 torch.save(self.model.state_dict(),
-                           os.path.join(self.model_dir, "trained-wd-{:.6f}.pt"
+                           os.path.join(self.model_dir, "trained-penalty-{:.6f}.pt"
                                                         "".format(self.weight_decay)))
             self.scheduler.step(epoch)
             self.lrs.append(self.scheduler.get_lr())

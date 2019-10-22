@@ -50,13 +50,15 @@ scheduler_steps = 20,40
 epochs = 30
 use_cuda = yes
 learning_rate=0.001
-weight_decay=0.0001
+weight_decay=0
+gradient_penalty=0
 lr_decay=0.1
 batch_size=64
 n_workers=2
 [DATA]
-data_dir = ~/data/SPEECH
+data_dir = data/speech_commands_prepared
 include_dirs = down,go,left,no,off,on,right,stop,up,yes
+n_test=1000
 [RESULTS]
 model_dir=data/models
 plot_dir=data/plots
@@ -73,7 +75,8 @@ In the `TRAINING` section:
 |`epochs`|_int_ - number of epochs to train the network|30|
 |`use_cuda`|_bool_ - whether to use GPU, if available|True|
 |`learning_rate`|_float_ - starting learning rate to use for training|0.001|
-|`weight_decay`|_float_ - weight decay for the optimizer to use during training|0.0001|
+|`weight_decay`|_float_ - weight decay for the optimizer to use during training|0.0|
+|`gradient_penalty`|_float_ - penalty for gradients wrt inputs |0.0|
 |`lr_decay`|_float_ - multiplier for the learning rate, will decrease the learning rate in the epochs marked as steps (`scheduler_steps`)|0.0001|
 |`batch_size`|_int_ - number of samples for each batch|64|
 |`n_workers`|_int_ - number of workers to use for loading the dataset|2|
@@ -84,6 +87,7 @@ In the `DATA` section:
 |---|---|---|
 |`data_dir`|_str_ - path where to find the prepared dataset|~/data/SPEECH|
 |`include_dirs`|_strings separated by commas_ (without spaces) - keywords (from the dataset) to include during training|down,go,left,no,off,on,right,stop,up,yes|
+|`n_test`|_int_ - number of samples to use for sec eval and creation of adversarial audios|1000|
 
 In the `RESULTS` section:
 
