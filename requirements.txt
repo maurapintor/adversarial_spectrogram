@@ -1,2 +1,4 @@
 librosa==0.7.1
 Pillow
+torch
+torchvision

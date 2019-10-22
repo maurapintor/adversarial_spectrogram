@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from audio_torch import ModelTrainer
 import numpy as np
 import os
@@ -12,9 +14,11 @@ if __name__ == '__main__':
         if model.endswith('.pt'):
             model_trainer.load_model(model)
             eps_values = np.arange(start=0, stop=0.1, step=0.01)
+            eps_values /= model_trainer.train_dataset.max_value
             accs = model_trainer.security_evaluation(eps_values)
             accuracies.append(accs)
-            plt.plot(eps_values, accs, label=model[:-6])
+            wd = Decimal(float(model.split('-')[-1][:-3]))
+            plt.plot(eps_values, accs, label="{:.2E}".format(wd))
             plt.title("Security evaluation")
             plt.xlabel("Perturbation strength")
             plt.ylabel("Test accuracy")
