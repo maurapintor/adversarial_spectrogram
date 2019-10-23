@@ -98,6 +98,29 @@ In the `RESULTS` section:
 
 ## Examples
 
+### Train a model
+
+After configuring the training parameters, we can already start with training a model. This can be easily done 
+with `train_model.py`. Note that you can train multiple models at the same time specifying different parameters in 
+the method call (_e.g._ `gradient_penalty`).
+
+```shell script
+python train_model.py
+```
+
+This will train the CNN defined in `src/net.py` with the parameters stored in the `config.ini` file.
+
+### Evaluate model
+
+If you just want to evaluate the model, you can run: 
+```shell script
+python evaluate_model.py
+```
+
+Note that you have to pass the model name and the loader you want to evaluate the model with. This will be useful 
+in the following sections.
+
+### Create adversarial spectrogram and convert back to audio
 
 
 

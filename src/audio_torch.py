@@ -97,10 +97,11 @@ class ModelTrainer:
             output = self.model(data)
             loss = self.criterion(output, target)
             if self.gradient_penalty != 0:
-                loss += torch.norm(torch.autograd.grad(self.criterion(output, target),
-                                            data,
-                                            retain_graph=True,
-                                            create_graph=True)[0])
+                loss += self.gradient_penalty * \
+                        torch.norm(torch.autograd.grad(self.criterion(output, target),
+                                                       data,
+                                                       retain_graph=True,
+                                                       create_graph=True)[0])
             loss.backward()
             self.optimizer.step()
             if batch_idx % self.log_interval == 0:  # print training stats
@@ -129,14 +130,22 @@ class ModelTrainer:
     def plot_info(self):
         plt.figure()
         plt.plot(self.losses)
-        plt.savefig(os.path.join(self.plot_dir, "losses_{}.pdf".format(self.weight_decay)), format='pdf')
+        plt.savefig(os.path.join(self.plot_dir, "losses_{}.pdf".format(self.gradient_penalty)), format='pdf')
         plt.figure()
         plt.plot(self.lrs)
-        plt.savefig(os.path.join(self.plot_dir, "learning_rates_{}.pdf".format(self.weight_decay)), format='pdf')
+        plt.savefig(os.path.join(self.plot_dir, "learning_rates_{}.pdf".format(self.gradient_penalty)), format='pdf')
 
-    def fit(self):
-        logging.info("Init training. LR: {}\tepochs: {}\tlr_scheduling: {}"
-                     "".format(self.scheduler.get_lr(), self.epochs, self.scheduler_steps))
+    def fit(self, penalty=None):
+        self.best_acc = 0
+        self.losses = []
+        self.lrs = []
+        if penalty is not None:
+            self.gradient_penalty = penalty
+        logging.info("Init training. LR: {}\tepochs: {}\tlr_scheduling: {}\tpenalty: {}"
+                     "".format(self.scheduler.get_lr(),
+                               self.epochs,
+                               self.scheduler_steps,
+                               self.gradient_penalty))
 
         for epoch in range(1, self.epochs + 1):
             self.losses.extend(self.train_epoch(epoch))
@@ -149,7 +158,7 @@ class ModelTrainer:
                              "\tSaving model...".format(val_acc, self.best_acc))
                 torch.save(self.model.state_dict(),
                            os.path.join(self.model_dir, "trained-penalty-{:.6f}.pt"
-                                                        "".format(self.weight_decay)))
+                                                        "".format(self.gradient_penalty)))
             self.scheduler.step(epoch)
             self.lrs.append(self.scheduler.get_lr())
         logging.info("Training completed. Computing test accuracy...")
