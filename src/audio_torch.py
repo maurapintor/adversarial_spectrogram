@@ -6,7 +6,7 @@ import torchattacks
 logging.basicConfig()
 logging.root.setLevel(logging.INFO)
 
-from audio_dataset import AudioDataFolders
+from src.audio_dataset import AudioDataFolders
 import torch
 from torchvision import transforms
 from torch.utils import data as data
@@ -14,9 +14,10 @@ from torch import optim
 import os
 import configparser
 from torch import nn
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from net import Net
-
+from src.net import Net
 
 class ModelTrainer:
     def __init__(self):
@@ -101,7 +102,7 @@ class ModelTrainer:
                         torch.norm(torch.autograd.grad(self.criterion(output, target),
                                                        data,
                                                        retain_graph=True,
-                                                       create_graph=True)[0])
+                                                       create_graph=True)[0], p=1)
             loss.backward()
             self.optimizer.step()
             if batch_idx % self.log_interval == 0:  # print training stats
@@ -142,10 +143,11 @@ class ModelTrainer:
         if penalty is not None:
             self.gradient_penalty = penalty
         logging.info("Init training. LR: {}\tepochs: {}\tlr_scheduling: {}\tpenalty: {}"
-                     "".format(self.scheduler.get_lr(),
+                     "\tkeywords : {}".format(self.scheduler.get_lr(),
                                self.epochs,
                                self.scheduler_steps,
-                               self.gradient_penalty))
+                               self.gradient_penalty,
+                               self.include_dirs))
 
         for epoch in range(1, self.epochs + 1):
             self.losses.extend(self.train_epoch(epoch))
