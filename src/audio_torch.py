@@ -177,7 +177,7 @@ class ModelTrainer:
             for data, target in loader:
                 yield data, target
         else:
-            attack = torchattacks.PGD(self.model, eps=eps, alpha=eps / 10, iters=10)
+            attack = torchattacks.PGD(self.model, eps=eps, alpha=eps / 20, iters=20)
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 adversarial_images = attack(data, target)
