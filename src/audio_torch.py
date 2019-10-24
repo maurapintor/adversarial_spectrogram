@@ -177,12 +177,12 @@ class ModelTrainer:
             for data, target in loader:
                 yield data, target
         else:
-            attack = torchattacks.IFGSM(self.model, eps=eps, alpha=eps / 10, iters=10)
+            attack = torchattacks.PGD(self.model, eps=eps, alpha=eps / 10, iters=10)
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 adversarial_images = attack(data, target)
-                adversarial_images[data < 1e-3] = data[data < 1e-3]
-                adversarial_images[adversarial_images < 1e-3] = data[adversarial_images < 1e-3]
+                adversarial_images[data < 1e-4] = data[data < 1e-4]
+                adversarial_images[adversarial_images < 1e-4] = data[adversarial_images < 1e-4]
                 yield adversarial_images, target
 
     def security_evaluation(self, values):
