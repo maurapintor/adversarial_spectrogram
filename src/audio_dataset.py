@@ -49,8 +49,7 @@ class AudioDataFolders(datasets.DatasetFolder):
         S = librosa.feature.melspectrogram(y, sr=sr, hop_length=HOP_LENGTH, power=2.0)
         return Image.fromarray(S / self.max_value)
 
-    @staticmethod
-    def invert_spectrogram(s):
+    def invert_spectrogram(self, s):
         return librosa.feature.inverse.mel_to_audio(s, sr=SAMPLING_RATE, hop_length=HOP_LENGTH, power=2.0)
 
     @staticmethod

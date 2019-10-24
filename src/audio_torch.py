@@ -181,6 +181,8 @@ class ModelTrainer:
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 adversarial_images = attack(data, target)
+                adversarial_images[data < 1e-3] = data[data < 1e-3]
+                adversarial_images[adversarial_images < 1e-3] = data[adversarial_images < 1e-3]
                 yield adversarial_images, target
 
     def security_evaluation(self, values):
@@ -196,6 +198,7 @@ class ModelTrainer:
         cls_to_idx = self.train_dataset.class_to_idx
         cls_to_idx = {v: k for k, v in cls_to_idx.items()}
         for (batch_images, batch_labels), (batch_images_adv, _) in zip(self.subset_loader, adv_loader):
+            eps = Decimal(eps)
             for image, adv_image, label in zip(batch_images, batch_images_adv, batch_labels):
                 image, adv_image = image.to(self.device), adv_image.to(self.device)
                 predicted = self.model(image.unsqueeze(0)).topk(1)[1]
@@ -203,7 +206,8 @@ class ModelTrainer:
                 if label.item() == predicted.item() \
                         and predicted.item() != adv_pred.item():
                     i += 1
-                    folder = os.path.join(self.plot_dir, "{}_to_{}".format(label.item(), adv_pred.item()))
+                    folder = os.path.join(self.plot_dir,
+                                          "eps{:.2E}_to_{}_{}".format(eps, label.item(), adv_pred.item()))
                     if not os.path.exists(folder):
                         os.mkdir(folder)
                         image, adv_image = self.inverse_rescale(image), self.inverse_rescale(adv_image)
@@ -235,22 +239,28 @@ class ModelTrainer:
                         plt.imshow(diff_img, cmap='gray_r')
                         plt.xticks([])
                         plt.yticks([])
-                        plt.show()
                         plt.savefig(os.path.join(folder,
-                                                 "perturbation_{}_to_{}.pdf"
-                                                 "".format(label.item(), adv_pred.item())),
+                                                 "perturbation_{}_to_{}_eps_{:.2E}.pdf"
+                                                 "".format(label.item(), adv_pred.item(),
+                                                           eps)),
                                     format='pdf')
-                        print("saving audios")
-                        audio1 = AudioDataFolders.invert_spectrogram(image)
-                        audio2 = AudioDataFolders.invert_spectrogram(adv_image)
+                        plt.close()
+                        print("Saving audios")
+                        audio1 = self.test_dataset.invert_spectrogram(image)
+                        audio2 = self.test_dataset.invert_spectrogram(adv_image)
                         AudioDataFolders.save_audio(
                             audio1,
                             os.path.join(folder,
-                                         'original_{}.wav'
-                                         ''.format(label.item())))
+                                         'original_{}_eps_{:.2E}.wav'
+                                         ''.format(label.item(), eps)))
+                        adv_audio_path = os.path.join(folder,
+                                                      'perturbed_{}_eps_{:.2E}.wav'
+                                                      ''.format(adv_pred.item(), eps))
                         AudioDataFolders.save_audio(
                             audio2,
-                            os.path.join(folder,
-                                         'perturbed_{}.wav'
-                                         ''.format(adv_pred.item())))
+                            adv_audio_path)
+                        print("Converting back to audio")
+                        retransformed = transforms.ToTensor()(self.test_dataset.loader(adv_audio_path))
+                        print(label.item(), adv_pred.item(), self.model(retransformed.unsqueeze(0)).topk(1)[1].item())
                         if i == n_samples: break
+            break
