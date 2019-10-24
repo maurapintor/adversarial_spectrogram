@@ -142,6 +142,34 @@ to have same length for all the samples. Adding the zeros in the original audio 
 in adding some _silent_ microsecond to the audio, but after computing the perturbation and 
 converting back, we had that what before was silent now sounded like a [_star wars' stormtrooper_](TODO) gun battle.
 
+We decided then to limit the perturbation to the part where an actual audio is present, so that 
+even if the audio is perturbed, it would still be partially overlapping with the original 
+sound, hence resulting less identifiable from human ear.
+
+```python
+adversarial_images[data < 1e-6] = data[data < 1e-6]
+```
+
+Our attack is not yet complete. We are using as features a spectrogram, which requires all 
+the pixels of the image to be greater than zero. Unfortunately the attack we are using has a 
+boundary that clips the pixel values in the range [0, 1], wich is our normalized tensor. For this 
+reason, we decided to reset the pixel that reach zero to the original image.
+
+```python
+adversarial_images[adversarial_images < 1e-6] = data[adversarial_images < 1e-6]
+```
+
+These tricks will definitely limit our attacks, but in the end the results will have higher quality.
+More strength in the perturbation will probably be required, since we are using only a part of the 
+worst-case adversarial changes here.
+
+To create adversarial audios, run the following command:
+
+```shell script
+python create_adv_audio.py
+```
+
+
 
 ### Run a security evaluation
 
