@@ -14,7 +14,7 @@ if __name__ == '__main__':
         if model.endswith('.pt'):
             print("Running sec eval for model: {}".format(model))
             model_trainer.load_model(model)
-            eps_values = np.arange(start=0, stop=0.5, step=0.05)
+            eps_values = np.arange(start=0, stop=1, step=0.05)
             eps_values /= model_trainer.train_dataset.max_value
             accs = model_trainer.security_evaluation(eps_values)
             accuracies.append(accs)
