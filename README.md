@@ -122,6 +122,29 @@ in the following sections.
 
 ### Create adversarial spectrogram and convert back to audio
 
+The adversarial spectrogram is obtained from a spectrogram in the training set, adding a 
+worst-case specific perturbation that is called _adversarial_. The adversarial perturbation causes 
+the model to fail its classification, resulting in the misclassification of the sample. 
+This attack is called **evasion attack**.
+
+There are many techniques for crafting adversarial examples, and here we will use techniques 
+called _gradient-based_, that exploit the gradient information for maximizing the target function 
+of the attack (sometimes simply the loss of the model). 
+
+Originally, these attacks were tested on images, creating the famous [*adversarial examples*](TODO). 
+In this case, we will not limit to the image domain. We will be still using an image and 
+computing the perturbation on the image, but later we are also interested to convert back 
+the signal (melspectrogram) to the audio domain and listen to the perturbed audio.
+
+In the first attempt we obtained a successful attack, but the perturbation was highly 
+identifiable in the audio. The problem stemmed from the added padding zeros of the audio in order 
+to have same length for all the samples. Adding the zeros in the original audio resulted 
+in adding some _silent_ microsecond to the audio, but after computing the perturbation and 
+converting back, we had that what before was silent now sounded like a [_star wars' stormtrooper_](TODO) gun battle.
+
+
+### Run a security evaluation
+
 
 
 ## Authors

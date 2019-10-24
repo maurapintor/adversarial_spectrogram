@@ -181,8 +181,8 @@ class ModelTrainer:
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 adversarial_images = attack(data, target)
-                adversarial_images[data < 1e-4] = data[data < 1e-4]
-                adversarial_images[adversarial_images < 1e-4] = data[adversarial_images < 1e-4]
+                adversarial_images[data < 1e-6] = data[data < 1e-6]
+                adversarial_images[adversarial_images < 1e-6] = data[adversarial_images < 1e-6]
                 yield adversarial_images, target
 
     def security_evaluation(self, values):
