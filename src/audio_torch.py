@@ -193,7 +193,7 @@ class ModelTrainer:
         else:
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
-                noisy = data + (torch.randn(data.shape).sign() * eps)
+                noisy = data + (torch.randn(data.shape, device=self.device).sign() * eps)
                 if mask is True:
                     noisy[data < 1e-6] = data[data < 1e-6]
                     noisy[noisy < 1e-6] = data[noisy < 1e-6]
