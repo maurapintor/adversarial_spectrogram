@@ -172,7 +172,7 @@ class ModelTrainer:
             torch.load(os.path.join(self.model_dir, model_name),
                        map_location=self.device))
 
-    def create_adv_ds(self, loader, eps):
+    def create_adv_ds(self, loader, eps, mask=False):
         if eps == 0:
             for data, target in loader:
                 yield data, target
@@ -181,14 +181,38 @@ class ModelTrainer:
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 adversarial_images = attack(data, target)
-                #adversarial_images[data < 1e-6] = data[data < 1e-6]
-                #adversarial_images[adversarial_images < 1e-6] = data[adversarial_images < 1e-6]
+                if mask is True:
+                    adversarial_images[data < 1e-6] = data[data < 1e-6]
+                    adversarial_images[adversarial_images < 1e-6] = data[adversarial_images < 1e-6]
                 yield adversarial_images, target
 
-    def security_evaluation(self, values):
+    def create_noisy_ds(self, loader, eps, mask=False):
+        if eps == 0:
+            for data, target in loader:
+                yield data, target
+        else:
+            for data, target in loader:
+                data, target = data.to(self.device), target.to(self.device)
+                noisy = data + (torch.randn(data.shape).sign() * eps)
+                if mask is True:
+                    noisy[data < 1e-6] = data[data < 1e-6]
+                    noisy[noisy < 1e-6] = data[noisy < 1e-6]
+                yield noisy, target
+
+    def security_evaluation(self, values, noise=False):
+        """
+
+        :param values:
+        :param noise: if True, uses random noise instead of the
+            worst-case adversarial perturbation
+        :return:
+        """
         accuracies = []
         for i, eps_value in enumerate(values):
-            adv_ds = self.create_adv_ds(self.subset_loader, eps=eps_value)
+            if noise is False:
+                adv_ds = self.create_adv_ds(self.subset_loader, eps=eps_value)
+            else:
+                adv_ds = self.create_noisy_ds(self.subset_loader, eps=eps_value)
             accuracies.append(self.evaluate(adv_ds))
         return accuracies
 
@@ -260,7 +284,9 @@ class ModelTrainer:
                             audio2,
                             adv_audio_path)
                         print("Converting back to audio")
-                        retransformed = transforms.ToTensor()(self.test_dataset.loader(adv_audio_path))
+                        retransformed = transforms.ToTensor()(self.test_dataset._load_spectrogram(adv_audio_path))
+                        print(retransformed.max())
+                        print(adv_image.max())
                         print(label.item(), adv_pred.item(), self.model(retransformed.unsqueeze(0)).topk(1)[1].item())
                         if i == n_samples: break
             break
