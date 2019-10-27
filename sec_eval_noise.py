@@ -33,5 +33,5 @@ if __name__ == '__main__':
             plt.ylim([0, 1])
     plt.legend()
     plt.xlabel("Perturbation (mels) x 1E4")
-    plt.savefig(os.path.join(model_trainer.plot_dir, "Security evaluation.pdf"), format='pdf')
+    plt.savefig(os.path.join(model_trainer.plot_dir, "Robustness evaluation.pdf"), format='pdf')
     np.save("accuracies", np.array(accuracies))
