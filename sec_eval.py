@@ -8,9 +8,11 @@ import matplotlib.pyplot as plt
 if __name__ == '__main__':
     model_trainer = ModelTrainer()
     accuracies = []
-    models = os.listdir(model_trainer.model_dir) 
+    models = ['trained-penalty-0.000000.pt', 'trained-penalty-0.000100.pt'] 
     plt.figure()
-    for model in models:
+    label = ['DNN', 'Robust DNN']
+    color = ['r', 'g']
+    for j, model in enumerate(models):
         if model.endswith('.pt'):
             print("Running sec eval for model: {}".format(model))
             model_trainer.load_model(model)
@@ -24,10 +26,11 @@ if __name__ == '__main__':
             else:
                 wd = Decimal(wd)
                 label_str = "gradient_penalty = {:.2E}".format(wd)
-            plt.plot(eps_values, accs, label=label_str)
+            plt.plot(eps_values*1e4, accs, label=label[j], c=color[j])
             plt.title("Security evaluation")
             plt.xlabel("Perturbation strength")
             plt.ylabel("Test accuracy")
     plt.legend()
+    plt.xlabel("Perturbation (mels) x 1E4")
     plt.savefig(os.path.join(model_trainer.plot_dir, "Security evaluation.pdf"), format='pdf')
     np.save("accuracies", np.array(accuracies))

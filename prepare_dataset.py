@@ -1,8 +1,8 @@
 import os
 from shutil import copyfile
 
-src_dir = 'speech_commands_dataset'
-dst_dir = 'speech_commands_prepared'
+src_dir = 'data/speech_commands_dataset'
+dst_dir = 'data/speech_commands_prepared'
 
 if not os.path.exists(dst_dir):
     os.mkdir(dst_dir)
