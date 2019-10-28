@@ -22,7 +22,7 @@ if __name__ == '__main__':
             accs_adv = model_trainer.security_evaluation(eps_values, noise=False)
             plt.plot(eps_values*1e4, accs_adv, label=label[j], c=color[j])
             accs_noise = model_trainer.security_evaluation(eps_values, noise=True)
-            plt.plot(eps_values*1e4, accs_noise, label=label[j], c=color[j], marker='-.')
+            plt.plot(eps_values*1e4, accs_noise, label=label[j], c=color[j], linestyle='-.')
             plt.title("Robustness evaluation (random noise)")
             plt.xlabel("Perturbation strength")
             plt.ylabel("Test accuracy")
