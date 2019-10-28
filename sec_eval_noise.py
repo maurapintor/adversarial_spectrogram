@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     model_trainer = ModelTrainer()
-    accuracies = []
-    models = ['trained-penalty-0.000000.pt', 'trained-penalty-0.000100.pt'] 
+    models = [
+        'trained-penalty-0.000000.pt',
+        'trained-penalty-0.000100.pt']
     plt.figure()
     label = ['DNN', 'Robust DNN']
     color = ['r', 'g']
@@ -18,15 +19,10 @@ if __name__ == '__main__':
             model_trainer.load_model(model)
             eps_values = np.arange(start=0, stop=1, step=0.05)
             eps_values /= model_trainer.train_dataset.max_value
-            accs = model_trainer.security_evaluation(eps_values, noise=True)
-            accuracies.append(accs)
-            wd = float(model.split('-')[-1][:-3])
-            if wd == 0:
-                label_str = "gradient_penalty = 0"
-            else:
-                wd = Decimal(wd)
-                label_str = "gradient_penalty = {:.2E}".format(wd)
-            plt.plot(eps_values*1e4, accs, label=label[j], c=color[j])
+            accs_adv = model_trainer.security_evaluation(eps_values, noise=False)
+            plt.plot(eps_values*1e4, accs_adv, label=label[j], c=color[j])
+            accs_noise = model_trainer.security_evaluation(eps_values, noise=True)
+            plt.plot(eps_values*1e4, accs_noise, label=label[j], c=color[j], marker='-')
             plt.title("Robustness evaluation (random noise)")
             plt.xlabel("Perturbation strength")
             plt.ylabel("Test accuracy")
@@ -34,4 +30,3 @@ if __name__ == '__main__':
     plt.legend()
     plt.xlabel("Perturbation (mels) x 1E4")
     plt.savefig(os.path.join(model_trainer.plot_dir, "Robustness evaluation.pdf"), format='pdf')
-    np.save("accuracies", np.array(accuracies))
