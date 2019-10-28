@@ -11,7 +11,8 @@ if __name__ == '__main__':
         'trained-penalty-0.000000.pt',
         'trained-penalty-0.000100.pt']
     plt.figure()
-    label = ['DNN', 'Robust DNN']
+    label = [['DNN (adv perturbation)', 'DNN (random noise)'],
+             ['Robust DNN (adv perturbation)', 'Robust DNN (random noise)']]
     color = ['r', 'g']
     for j, model in enumerate(models):
         if model.endswith('.pt'):
@@ -20,10 +21,10 @@ if __name__ == '__main__':
             eps_values = np.arange(start=0, stop=1, step=0.05)
             eps_values /= model_trainer.train_dataset.max_value
             accs_adv = model_trainer.security_evaluation(eps_values, noise=False)
-            plt.plot(eps_values*1e4, accs_adv, label=label[j], c=color[j])
+            plt.plot(eps_values*1e4, accs_adv, label=label[j][0], c=color[j])
             accs_noise = model_trainer.security_evaluation(eps_values, noise=True)
-            plt.plot(eps_values*1e4, accs_noise, label=label[j], c=color[j], linestyle='-.')
-            plt.title("Robustness evaluation (random noise)")
+            plt.plot(eps_values*1e4, accs_noise, label=label[j][1], c=color[j], linestyle='-.')
+            plt.title("Robustness evaluation")
             plt.xlabel("Perturbation strength")
             plt.ylabel("Test accuracy")
             plt.ylim([0, 1])
