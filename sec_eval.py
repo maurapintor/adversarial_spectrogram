@@ -24,6 +24,7 @@ if __name__ == '__main__':
             plt.title("Security evaluation")
             plt.xlabel("Perturbation strength")
             plt.ylabel("Test accuracy")
+            plt.ylim([0, 1])
     plt.xlabel("Perturbation (mels) x 1E4")
     plt.savefig(os.path.join(model_trainer.plot_dir, "Security evaluation.pdf"), format='pdf')
     np.save("accuracies", np.array(accuracies))
