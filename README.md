@@ -177,4 +177,4 @@ python create_adv_audio.py
 
 ## Authors
 
-* **Maura Pintor** - *University of Cagliari* - [maupin1991](https://maupin1991.github.io/)
+* **Maura Pintor** - *University of Cagliari* - [maurapintor](https://maurapintor.github.io/)
